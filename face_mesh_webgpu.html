@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Face Mesh - MediaPipe Tasks Vision (GPU Optimized) with FPS</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 1280px;
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        .output_canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 20px cyan;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: cyan;
+            font-family: monospace;
+            font-size: 20px;
+            animation: blink 1s infinite;
+            z-index: 10;
+        }
+
+        /* Thêm style cho FPS nếu cần hiển thị bằng HTML, nhưng ta sẽ vẽ nó lên canvas */
+        /* FPS Display sẽ được vẽ trực tiếp lên Canvas */
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="loading" id="loading-text">Đang tải Model (GPU)...</div>
+        <video class="input_video" autoplay playsinline></video>
+        <canvas class="output_canvas"></canvas>
+    </div>
+
+    <script type="module">
+        import {
+            FaceLandmarker,
+            FilesetResolver,
+            DrawingUtils
+        } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js";
+
+        const video = document.querySelector('.input_video');
+        const canvasElement = document.querySelector('.output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loadingText = document.getElementById('loading-text');
+
+        let faceLandmarker;
+        let runningMode = "VIDEO";
+        let lastVideoTime = -1;
+        let results = undefined;
+
+        // --- BIẾN MỚI CHO FPS ---
+        let lastFrameTime = performance.now();
+        let fps = 0;
+        // -------------------------
+
+        // Cấu hình việc vẽ kết nối (thay thế drawing_utils cũ)
+        const drawingUtils = new DrawingUtils(canvasCtx);
+
+        // 1. Khởi tạo MediaPipe Tasks với GPU Delegate
+        async function createFaceLandmarker() {
+            // Đã sửa lỗi 404 tiềm ẩn bằng cách bỏ số version (dùng @0.10.0 nếu vẫn lỗi)
+            const filesetResolver = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+            );
+
+            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                    delegate: "GPU"
+                },
+                outputFaceBlendshapes: false,
+                runningMode: runningMode,
+                numFaces: 4,
+                minFaceDetectionConfidence: 0.5,
+                minFacePresenceConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            loadingText.innerText = "Đang mở Camera...";
+            enableCam();
+        }
+
+        // 2. Mở Camera
+        function enableCam() {
+            if (!faceLandmarker) return;
+
+            const constraints = { video: { width: 1280, height: 720 } };
+
+            navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+                video.srcObject = stream;
+                video.addEventListener("loadeddata", predictWebcam);
+                loadingText.style.display = "none";
+            });
+        }
+
+        // 3. Vòng lặp xử lý (Loop)
+        async function predictWebcam() {
+            // --- TÍNH TOÁN FPS ---
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastFrameTime;
+            fps = 1000 / deltaTime; // FPS = 1000ms / thời gian giữa 2 frame
+            lastFrameTime = currentTime;
+            // ---------------------
+
+            // Điều chỉnh kích thước canvas theo video thực tế
+            if (canvasElement.width !== video.videoWidth || canvasElement.height !== video.videoHeight) {
+                canvasElement.width = video.videoWidth;
+                canvasElement.height = video.videoHeight;
+            }
+
+            let startTimeMs = performance.now();
+
+            // Chỉ xử lý khi có frame mới
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                results = faceLandmarker.detectForVideo(video, startTimeMs);
+            }
+
+            // Vẽ lên Canvas
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            // Lật gương (Dùng save/restore)
+            canvasCtx.translate(canvasElement.width, 0);
+            canvasCtx.scale(-1, 1);
+
+            // Vẽ Video gốc
+            canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
+            // Vẽ Face Mesh
+            if (results && results.faceLandmarks) {
+                for (const [index, landmarks] of results.faceLandmarks.entries()) {
+
+                    // Vẽ lưới mặt
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "#C0C0C070", lineWidth: 1 });
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "#FF3030", lineWidth: 2 });
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, { color: "#FF3030", lineWidth: 2 });
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, { color: "#30FF30", lineWidth: 2 });
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, { color: "#30FF30", lineWidth: 2 });
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, { color: "#E0E0E0", lineWidth: 2 });
+                    drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LIPS, { color: "#E0E0E0", lineWidth: 2 });
+
+                    // Kết thúc lật gương tạm thời để vẽ Box/Text
+                    canvasCtx.restore();
+
+                    // Tính toán bounding box
+                    const xList = landmarks.map(l => (1 - l.x) * canvasElement.width);
+                    const yList = landmarks.map(l => l.y * canvasElement.height);
+
+                    const minX = Math.min(...xList) - 10;
+                    const maxX = Math.max(...xList) + 10;
+                    const minY = Math.min(...yList) - 10;
+                    const maxY = Math.max(...yList) + 10;
+
+                    // Vẽ Box
+                    canvasCtx.beginPath();
+                    canvasCtx.rect(minX, minY, maxX - minX, maxY - minY);
+                    canvasCtx.lineWidth = 3;
+                    canvasCtx.strokeStyle = '#FFFF00';
+                    canvasCtx.stroke();
+
+                    // Vẽ Text (TARGET #)
+                    canvasCtx.fillStyle = '#FFFF00';
+                    canvasCtx.font = 'bold 16px monospace';
+                    canvasCtx.fillText(`TARGET #${index + 1}`, minX, minY - 10);
+
+                    // Quay lại chế độ lật gương để vẽ face tiếp theo (nếu có)
+                    canvasCtx.save();
+                    canvasCtx.translate(canvasElement.width, 0);
+                    canvasCtx.scale(-1, 1);
+                }
+            }
+            canvasCtx.restore(); // Kết thúc quá trình vẽ lưới/box
+
+            // --- VẼ FPS (Luôn ở chế độ KHÔNG lật) ---
+            canvasCtx.fillStyle = 'cyan';
+            canvasCtx.font = 'bold 24px monospace';
+            canvasCtx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 30);
+
+            // --- GỌI ĐỆ QUY CHO FRAME TIẾP THEO ---
+            window.requestAnimationFrame(predictWebcam);
+        }
+
+        // Bắt đầu
+        createFaceLandmarker();
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Face Mesh WOW Effect (Legacy API) with FPS</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 1280px;
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        .output_canvas {
+            width: 100%;
+            height: auto;
+            /* Đã bỏ transform: scaleX(-1) để xử lý lật trong JS */
+            border-radius: 10px;
+            box-shadow: 0 0 20px cyan;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: cyan;
+            font-family: monospace;
+            font-size: 20px;
+            animation: blink 1s infinite;
+            z-index: 10;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="loading" id="loading-text">Đang tìm khuôn mặt...</div>
+        <video class="input_video"></video>
+        <canvas class="output_canvas" width="1280" height="720"></canvas>
+    </div>
+
+    <script>
+        const videoElement = document.getElementsByClassName('input_video')[0];
+        const canvasElement = document.getElementsByClassName('output_canvas')[0];
+        const canvasCtx = canvasElement.getContext('2d');
+        const loadingText = document.getElementById('loading-text');
+
+        // --- BIẾN MỚI CHO FPS ---
+        let lastFrameTime = performance.now();
+        let fps = 0;
+        // -------------------------
+
+        function onResults(results) {
+            loadingText.style.display = 'none';
+
+            // --- TÍNH TOÁN FPS ---
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastFrameTime;
+            fps = 1000 / deltaTime; // FPS = 1000ms / thời gian giữa 2 frame
+            lastFrameTime = currentTime;
+            // ---------------------
+
+            // 1. Lật Context để vẽ Video (Tạo hiệu ứng gương)
+            canvasCtx.save();
+            canvasCtx.translate(canvasElement.width, 0);
+            canvasCtx.scale(-1, 1);
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.restore(); // Trả về trạng thái bình thường (KHÔNG LẬT)
+
+            if (results.multiFaceLandmarks) {
+                results.multiFaceLandmarks.forEach((landmarks, index) => {
+
+                    // 2. Lật Context để vẽ Mesh (Khớp với video gương)
+                    canvasCtx.save();
+                    canvasCtx.translate(canvasElement.width, 0);
+                    canvasCtx.scale(-1, 1);
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, { color: '#00FFCC', lineWidth: 0.5 });
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_RIGHT_EYE, { color: '#FF0000', lineWidth: 2 });
+                    drawConnectors(canvasCtx, landmarks, FACEMESH_LEFT_EYE, { color: '#FF0000', lineWidth: 2 });
+                    canvasCtx.restore(); // Trả về trạng thái bình thường (KHÔNG LẬT)
+
+                    // 3. Tính toán Box (Lưu ý: Vì hình bị lật, tọa độ X thực tế là 1 - x)
+                    const xList = landmarks.map(l => (1 - l.x) * canvasElement.width);
+                    const yList = landmarks.map(l => l.y * canvasElement.height);
+
+                    const minX = Math.min(...xList) - 20;
+                    const maxX = Math.max(...xList) + 20;
+                    const minY = Math.min(...yList) - 20;
+                    const maxY = Math.max(...yList) + 20;
+
+                    // 4. Vẽ Box & Text (Ở chế độ KHÔNG lật để chữ xuôi chiều)
+                    canvasCtx.beginPath();
+                    canvasCtx.rect(minX, minY, maxX - minX, maxY - minY);
+                    canvasCtx.lineWidth = 3;
+                    canvasCtx.strokeStyle = '#FFFF00';
+                    canvasCtx.stroke();
+
+                    canvasCtx.fillStyle = '#FFFF00';
+                    canvasCtx.font = 'bold 16px monospace';
+                    canvasCtx.fillText(`TARGET #${index + 1} LOCKED`, minX, minY - 10);
+                });
+            }
+
+            // --- VẼ FPS (Luôn ở chế độ KHÔNG lật) ---
+            canvasCtx.fillStyle = 'cyan';
+            canvasCtx.font = 'bold 24px monospace';
+            canvasCtx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 30);
+            // -----------------------------------------
+        }
+
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+            }
+        });
+
+        faceMesh.setOptions({
+            maxNumFaces: 4,
+            refinerLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        faceMesh.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await faceMesh.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720
+        });
+        camera.start();
+    </script>
+
+</body>
+
+</html>

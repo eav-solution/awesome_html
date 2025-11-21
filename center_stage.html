@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Face Mesh - Center Stage Camera (Zoom theo khuôn mặt)</title>
+    <style>
+        /* CSS được giữ nguyên để video/canvas full màn hình */
+        body {
+            margin: 0;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 1280px;
+            /* Đảm bảo tỉ lệ khung hình 16:9 nếu video là 1280x720 */
+            aspect-ratio: 16 / 9;
+        }
+
+        .input_video {
+            display: none;
+        }
+
+        .output_canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            box-shadow: 0 0 30px cyan;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: cyan;
+            font-family: monospace;
+            font-size: 20px;
+            animation: blink 1s infinite;
+            z-index: 10;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="loading" id="loading-text">Đang tải Model (GPU)...</div>
+        <video class="input_video" autoplay playsinline></video>
+        <canvas class="output_canvas"></canvas>
+    </div>
+
+    <script type="module">
+        import {
+            FaceLandmarker,
+            FilesetResolver,
+            DrawingUtils
+        } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js";
+
+        const video = document.querySelector('.input_video');
+        const canvasElement = document.querySelector('.output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loadingText = document.getElementById('loading-text');
+
+        let faceLandmarker;
+        let runningMode = "VIDEO";
+        let lastVideoTime = -1;
+        let results = undefined;
+
+        // --- BIẾN MỚI CHO FPS ---
+        let lastFrameTime = performance.now();
+        let fps = 0;
+        // -------------------------
+
+        // --- BIẾN CHO HIỆU ỨNG CENTER STAGE ---
+        // Kích thước khu vực cắt (0.6 = zoom 1.67X)
+        const CROP_SIZE_RATIO = 1;
+
+        // Tọa độ và kích thước khu vực cắt (crop) hiện tại
+        let currentCrop = { x: 0, y: 0, w: 0, h: 0 };
+
+        // Tốc độ di chuyển mềm (smoother) - Giá trị càng nhỏ, càng mượt
+        const LERP_FACTOR = 0.1;
+        // ----------------------------------------
+
+
+        // Cấu hình việc vẽ kết nối (được giữ nguyên nhưng không dùng khi Center Stage đang chạy)
+        const drawingUtils = new DrawingUtils(canvasCtx);
+
+        // 1. Khởi tạo MediaPipe Tasks với GPU Delegate
+        async function createFaceLandmarker() {
+            const filesetResolver = await FilesetResolver.forVisionTasks(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+            );
+
+            faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                baseOptions: {
+                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                    delegate: "GPU"
+                },
+                outputFaceBlendshapes: false,
+                runningMode: runningMode,
+                // Chỉ theo dõi 1 khuôn mặt để mô phỏng Center Stage tiêu chuẩn
+                numFaces: 1,
+                minFaceDetectionConfidence: 0.5,
+                minFacePresenceConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            loadingText.innerText = "Đang mở Camera...";
+            enableCam();
+        }
+
+        // 2. Mở Camera
+        function enableCam() {
+            if (!faceLandmarker) return;
+
+            // Đặt độ phân giải cho video
+            const constraints = { video: { width: 1280, height: 720 } };
+
+            navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+                video.srcObject = stream;
+                video.addEventListener("loadeddata", () => {
+                    // Khởi tạo khu vực cắt ban đầu là toàn bộ khung hình
+                    currentCrop = {
+                        x: 0,
+                        y: 0,
+                        w: video.videoWidth,
+                        h: video.videoHeight
+                    };
+                    predictWebcam();
+                });
+                loadingText.style.display = "none";
+            });
+        }
+
+        // Hàm tính toán Lerp (Linear Interpolation) để làm chuyển động mượt mà
+        function lerp(start, end, factor) {
+            return start + (end - start) * factor;
+        }
+
+
+        // 3. Vòng lặp xử lý (Loop)
+        async function predictWebcam() {
+            // --- TÍNH TOÁN FPS ---
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastFrameTime;
+            fps = 1000 / deltaTime;
+            lastFrameTime = currentTime;
+            // ---------------------
+
+            // Điều chỉnh kích thước canvas theo video thực tế
+            if (canvasElement.width !== video.videoWidth || canvasElement.height !== video.videoHeight) {
+                canvasElement.width = video.videoWidth;
+                canvasElement.height = video.videoHeight;
+            }
+
+            let startTimeMs = performance.now();
+
+            // Chỉ xử lý khi có frame mới
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                results = faceLandmarker.detectForVideo(video, startTimeMs);
+            }
+
+            // Xử lý Logic Center Stage
+            let targetCrop = { ...currentCrop }; // Khu vực cắt mục tiêu (default là hiện tại)
+
+            if (results && results.faceLandmarks.length > 0) {
+                // Chỉ lấy mặt đầu tiên (mặt chính)
+                const landmarks = results.faceLandmarks[0];
+
+                // 1. Tính toán Bounding Box (BB) của khuôn mặt trong không gian chuẩn hóa (0 đến 1)
+                const xList = landmarks.map(l => l.x);
+                const yList = landmarks.map(l => l.y);
+
+                const minX_norm = Math.min(...xList);
+                const maxX_norm = Math.max(...xList);
+                const minY_norm = Math.min(...yList);
+                const maxY_norm = Math.max(...yList);
+
+                // Điểm trung tâm của khuôn mặt trong không gian chuẩn hóa
+                const centerX_norm = (minX_norm + maxX_norm) / 2;
+                const centerY_norm = (minY_norm + maxY_norm) / 2;
+
+                // 2. Tính toán Khu vực cắt (Target Crop)
+                let cropW_norm = CROP_SIZE_RATIO;
+                let cropH_norm = CROP_SIZE_RATIO * (video.videoHeight / video.videoWidth);
+
+                // Góc trên bên trái của khu vực cắt mục tiêu trong không gian chuẩn hóa
+                let targetCropX_norm = centerX_norm - (cropW_norm / 2);
+                let targetCropY_norm = centerY_norm - (cropH_norm / 2);
+
+                // 3. Giới hạn khu vực cắt để không vượt ra ngoài khung hình (0 đến 1)
+                targetCropX_norm = Math.max(0, Math.min(targetCropX_norm, 1 - cropW_norm));
+                targetCropY_norm = Math.max(0, Math.min(targetCropY_norm, 1 - cropH_norm));
+
+                // 4. Chuyển đổi sang tọa độ pixel thực tế của video
+                targetCrop = {
+                    // Lật trục X cho Center Stage: (1 - centerX_norm) * video.videoWidth
+                    // Camera máy tính thường bị lật, nên ta lật lại tọa độ X.
+                    x: (1 - (targetCropX_norm + cropW_norm)) * video.videoWidth,
+                    y: targetCropY_norm * video.videoHeight,
+                    w: cropW_norm * video.videoWidth,
+                    h: cropH_norm * video.videoHeight
+                };
+            }
+
+            // 5. Làm mượt chuyển động (LERP)
+            currentCrop.x = lerp(currentCrop.x, targetCrop.x, LERP_FACTOR);
+            currentCrop.y = lerp(currentCrop.y, targetCrop.y, LERP_FACTOR);
+            currentCrop.w = lerp(currentCrop.w, targetCrop.w, LERP_FACTOR);
+            currentCrop.h = lerp(currentCrop.h, targetCrop.h, LERP_FACTOR);
+
+
+            // --- VẼ LÊN CANVAS (Áp dụng Center Stage) ---
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            // Tọa độ nguồn (Source) và Đích (Destination)
+            const sx = currentCrop.x;
+            const sy = currentCrop.y;
+            const sw = currentCrop.w;
+            const sh = currentCrop.h;
+
+            // Vẽ toàn bộ khung canvas (destination)
+            const dx = 0;
+            const dy = 0;
+            const dw = canvasElement.width;
+            const dh = canvasElement.height;
+
+            // Vẽ Video gốc: Cắt một khu vực từ video (sx, sy, sw, sh) và vẽ nó lên toàn bộ canvas (dx, dy, dw, dh)
+            // Lần này KHÔNG cần lật gương canvas vì ta đã lật tọa độ X nguồn (sx) ở bước 4.
+            canvasCtx.drawImage(video, sx, sy, sw, sh, dx, dy, dw, dh);
+
+            canvasCtx.restore();
+
+            // --- VẼ FPS ---
+            canvasCtx.fillStyle = 'cyan';
+            canvasCtx.font = 'bold 24px monospace';
+            canvasCtx.fillText(`FPS: ${fps.toFixed(1)}`, 10, 30);
+
+            // --- GỌI ĐỆ QUY CHO FRAME TIẾP THEO ---
+            window.requestAnimationFrame(predictWebcam);
+        }
+
+        // Bắt đầu
+        createFaceLandmarker();
+    </script>
+
+</body>
+
+</html>
