@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hand Counter - Fixed</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #111;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* Khung chứa Video và Canvas */
+        .camera-box {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            background: black;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+            border: 2px solid #333;
+        }
+
+        /* Lật ngược để giống gương */
+        video,
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        /* Hiển thị số đếm (HUD) */
+        .hud-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-left: 4px solid #00ff00;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .count-number {
+            font-size: 64px;
+            font-weight: bold;
+            color: #00ff00;
+            line-height: 1;
+            display: block;
+        }
+
+        .count-label {
+            font-size: 14px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Nút bấm */
+        #startBtn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 18px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        #startBtn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        #startBtn:hover:not(:disabled) {
+            background: #218838;
+            transform: scale(1.05);
+        }
+
+        #loading {
+            margin-top: 10px;
+            color: #aaa;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="camera-box">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output"></canvas>
+
+        <div class="hud-panel">
+            <span class="count-label">SỐ NGÓN TAY</span>
+            <span class="count-number" id="displayCount">0</span>
+        </div>
+    </div>
+
+    <div id="loading">Đang tải mô hình AI...</div>
+    <button id="startBtn" disabled>Bật Camera</button>
+
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+
+        const video = document.getElementById("webcam");
+        const canvas = document.getElementById("output");
+        const ctx = canvas.getContext("2d");
+        const displayCount = document.getElementById("displayCount");
+        const startBtn = document.getElementById("startBtn");
+        const loadingText = document.getElementById("loading");
+
+        let handLandmarker = undefined;
+        let lastVideoTime = -1;
+        let runningMode = "VIDEO";
+
+        // 1. Cài đặt & Tải Model MediaPipe
+        async function createHandLandmarker() {
+            try {
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+                );
+
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: runningMode,
+                    numHands: 1 // Chỉ nhận diện 1 tay để chính xác hơn khi đếm
+                });
+
+                loadingText.innerText = "Sẵn sàng!";
+                startBtn.disabled = false;
+            } catch (error) {
+                loadingText.innerText = "Lỗi tải model: " + error;
+            }
+        }
+        createHandLandmarker();
+
+        // 2. Kích hoạt Camera
+        startBtn.addEventListener("click", () => {
+            if (!handLandmarker) return;
+
+            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+                video.srcObject = stream;
+                video.addEventListener("loadeddata", predictWebcam);
+                startBtn.style.display = 'none'; // Ẩn nút khi chạy
+                loadingText.style.display = 'none';
+            });
+        });
+
+        // 3. Vòng lặp nhận diện (Đã fix lỗi undefined)
+        async function predictWebcam() {
+            // Đảm bảo kích thước canvas khớp video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            let startTimeMs = performance.now();
+
+            if (lastVideoTime !== video.currentTime && video.readyState >= 2) {
+                lastVideoTime = video.currentTime;
+
+                // Gọi AI
+                const results = handLandmarker.detectForVideo(video, startTimeMs);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Kiểm tra nếu có kết quả
+                if (results.landmarks && results.landmarks.length > 0) {
+                    const landmarks = results.landmarks[0];
+
+                    // FIX LỖI: Sử dụng Optional Chaining (?.) để tránh crash nếu handedness rỗng
+                    const handedness = results.handedness?.[0]?.[0]?.categoryName || "Right";
+
+                    drawHand(landmarks);
+                    const count = countFingers(landmarks, handedness);
+
+                    displayCount.innerText = count;
+                } else {
+                    displayCount.innerText = "0";
+                }
+            }
+
+            window.requestAnimationFrame(predictWebcam);
+        }
+
+        // Logic đếm ngón tay
+        function countFingers(lm, handType) {
+            let fingers = 0;
+
+            // --- Ngón cái (Thumb) ---
+            // Logic: So sánh toạ độ X của đầu ngón (4) và khớp (3)
+            // Lưu ý: Video bị lật (mirror) nhưng toạ độ AI trả về vẫn theo logic ảnh gốc
+            if (handType === "Right") {
+                // Tay phải: Nếu đầu ngón cái nằm bên TRÁI khớp (x nhỏ hơn) -> Đang mở
+                if (lm[4].x < lm[3].x) fingers++;
+            } else {
+                // Tay trái: Nếu đầu ngón cái nằm bên PHẢI khớp (x lớn hơn) -> Đang mở
+                if (lm[4].x > lm[3].x) fingers++;
+            }
+
+            // --- 4 Ngón còn lại (Trỏ, Giữa, Nhẫn, Út) ---
+            // Logic: So sánh toạ độ Y (Cao độ). Đầu ngón (Tip) phải cao hơn Khớp nối (PIP)
+            // Trong Canvas: Y=0 ở trên cùng, càng xuống dưới Y càng tăng.
+            // Do đó: Tip.y < Pip.y nghĩa là ngón đang dựng lên.
+
+            if (lm[8].y < lm[6].y) fingers++;  // Trỏ (Index)
+            if (lm[12].y < lm[10].y) fingers++; // Giữa (Middle)
+            if (lm[16].y < lm[14].y) fingers++; // Nhẫn (Ring)
+            if (lm[20].y < lm[18].y) fingers++; // Út (Pinky)
+
+            return fingers;
+        }
+
+        // Hàm vẽ khung xương đơn giản
+        function drawHand(landmarks) {
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.fillStyle = "#00ff00";
+
+            // Các đường nối cơ bản
+            const connections = [
+                [0, 1], [1, 2], [2, 3], [3, 4],     // Ngón cái
+                [0, 5], [5, 6], [6, 7], [7, 8],     // Ngón trỏ
+                [5, 9], [9, 10], [10, 11], [11, 12],// Ngón giữa
+                [9, 13], [13, 14], [14, 15], [15, 16], // Ngón nhẫn
+                [13, 17], [17, 18], [18, 19], [19, 20],// Ngón út
+                [0, 17] // Cổ tay
+            ];
+
+            // Vẽ đường nối
+            connections.forEach(([start, end]) => {
+                const p1 = landmarks[start];
+                const p2 = landmarks[end];
+                ctx.beginPath();
+                ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+                ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+                ctx.stroke();
+            });
+
+            // Vẽ các khớp
+            landmarks.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x * canvas.width, point.y * canvas.height, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+        }
+    </script>
+</body>
+
+</html>

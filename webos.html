@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebOS 3.0 - WOW Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Dynamic Wallpapers */
+        .wallpaper-1 {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        .wallpaper-2 {
+            background: radial-gradient(circle at center, #1a2a6c, #b21f1f, #fdbb2d);
+        }
+
+        .wallpaper-3 {
+            background: linear-gradient(to bottom, #000428, #004e92);
+        }
+
+        @keyframes gradient {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Window Transitions */
+        .window {
+            transition: transform 0.15s, opacity 0.15s, width 0.2s, height 0.2s, box-shadow 0.2s;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .window:hover {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .window.dragging {
+            transition: none;
+            opacity: 0.95;
+            transform: scale(1.02);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+        }
+
+        .window.minimized {
+            transform: scale(0) translateY(200px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .window.maximized {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: calc(100% - 48px) !important;
+            border-radius: 0 !important;
+        }
+
+        /* Gravity Mode Class - removes transitions for smooth physics */
+        .window.gravity-mode {
+            transition: opacity 0.15s, width 0.2s, height 0.2s;
+        }
+
+        /* Boot Screen */
+        #boot-screen {
+            z-index: 9999;
+            transition: opacity 0.8s ease-out;
+        }
+
+        /* Toast Notification */
+        .toast {
+            animation: slideIn 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Context Menu */
+        #context-menu {
+            transform-origin: top left;
+            animation: scaleIn 0.1s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen wallpaper-1 overflow-hidden relative text-gray-100" id="main-body">
+
+    <!-- Interactive Background Canvas -->
+    <canvas id="bg-canvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-60"></canvas>
+
+    <!-- Boot Screen -->
+    <div id="boot-screen" class="absolute inset-0 bg-black flex flex-col items-center justify-center text-white">
+        <div class="relative">
+            <div class="absolute inset-0 bg-blue-500 blur-xl opacity-50 rounded-full animate-pulse"></div>
+            <i class="fa-solid fa-atom text-7xl mb-4 text-blue-400 relative z-10 animate-spin-slow"
+                style="animation-duration: 10s;"></i>
+        </div>
+        <h1
+            class="text-3xl font-bold mb-2 tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+            WebOS 3.0</h1>
+        <p class="text-gray-500 text-sm mb-6">Initialize Core Systems...</p>
+        <div class="w-64 h-1 bg-gray-800 rounded-full overflow-hidden">
+            <div id="boot-progress"
+                class="h-full bg-gradient-to-r from-blue-500 to-purple-600 w-0 transition-all duration-[2000ms]"></div>
+        </div>
+    </div>
+
+    <!-- Desktop Icons Container -->
+    <div id="desktop-icons"
+        class="absolute top-0 left-0 p-4 grid grid-flow-col grid-rows-6 gap-4 h-[calc(100vh-3rem)] w-fit z-10">
+        <!-- Icons injected by JS -->
+    </div>
+
+    <!-- Window Container -->
+    <div id="window-area" class="absolute inset-0 pointer-events-none z-20">
+        <!-- Windows injected by JS -->
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="absolute top-4 right-4 flex flex-col gap-2 z-[100] pointer-events-none"></div>
+
+    <!-- Context Menu -->
+    <div id="context-menu"
+        class="fixed hidden bg-gray-800/90 backdrop-blur-md border border-white/10 rounded-lg shadow-2xl w-56 py-2 z-[100] text-sm">
+        <div class="px-3 py-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Desktop Options</div>
+        <button onclick="changeWallpaper()"
+            class="w-full text-left px-4 py-2 hover:bg-blue-600 hover:text-white flex items-center gap-3 transition">
+            <i class="fa-regular fa-image w-4"></i> Change Wallpaper
+        </button>
+        <button onclick="toggleGravity()"
+            class="w-full text-left px-4 py-2 hover:bg-blue-600 hover:text-white flex items-center gap-3 transition group">
+            <i class="fa-solid fa-apple-whole w-4 group-hover:animate-bounce"></i>
+            <span id="gravity-text">Enable Gravity</span>
+        </button>
+        <div class="h-px bg-gray-700 my-1"></div>
+        <button onclick="location.reload()"
+            class="w-full text-left px-4 py-2 hover:bg-red-500/80 hover:text-white flex items-center gap-3 transition">
+            <i class="fa-solid fa-rotate-right w-4"></i> Restart System
+        </button>
+    </div>
+
+    <!-- Start Menu -->
+    <div id="start-menu"
+        class="absolute bottom-14 left-2 w-80 bg-gray-900/90 backdrop-blur-xl rounded-lg shadow-2xl transform transition-all duration-200 origin-bottom-left scale-0 opacity-0 border border-white/10 z-50 flex flex-col overflow-hidden">
+        <div class="p-4 bg-gradient-to-r from-gray-800 to-gray-900 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold ring-2 ring-white/20">
+                    U</div>
+                <div>
+                    <div class="font-semibold">User</div>
+                    <div class="text-xs text-gray-400">Administrator</div>
+                </div>
+            </div>
+        </div>
+        <div class="p-2 grid grid-cols-1 gap-1 max-h-96 overflow-y-auto" id="start-menu-apps">
+            <!-- App List injected by JS -->
+        </div>
+        <div class="p-3 bg-gray-800/50 border-t border-white/10 flex justify-between">
+            <button class="p-2 hover:bg-white/10 rounded transition"><i class="fa-solid fa-gear"></i></button>
+            <button onclick="location.reload()" class="p-2 hover:bg-red-500/50 rounded transition"><i
+                    class="fa-solid fa-power-off"></i></button>
+        </div>
+    </div>
+
+    <!-- Taskbar -->
+    <div
+        class="absolute bottom-0 w-full h-12 bg-gray-900/80 backdrop-blur-xl border-t border-white/10 flex items-center justify-between px-2 z-50 shadow-lg">
+        <div class="flex items-center gap-2 h-full">
+            <!-- Start Button -->
+            <button id="start-btn"
+                class="h-9 w-9 rounded flex items-center justify-center hover:bg-white/10 transition text-blue-400 hover:text-blue-300 group">
+                <i class="fa-brands fa-windows text-xl group-hover:scale-110 transition"></i>
+            </button>
+
+            <!-- Search -->
+            <div
+                class="hidden md:flex items-center bg-white/5 hover:bg-white/10 transition rounded-full px-3 py-1 h-8 w-48 ml-2 border border-white/5">
+                <i class="fa-solid fa-magnifying-glass text-xs text-gray-400 mr-2"></i>
+                <span class="text-xs text-gray-400">Search...</span>
+            </div>
+
+            <!-- Open Apps Dock -->
+            <div id="taskbar-apps" class="flex items-center gap-1 ml-4 h-full px-2 border-l border-white/10">
+                <!-- Taskbar items injected here -->
+            </div>
+        </div>
+
+        <!-- System Tray -->
+        <div class="flex items-center gap-3 px-2 h-full">
+            <div class="flex gap-3 text-xs text-gray-300 px-2 py-1 bg-white/5 rounded-full border border-white/5">
+                <i class="fa-solid fa-wifi hover:text-white cursor-pointer"></i>
+                <i class="fa-solid fa-volume-high hover:text-white cursor-pointer"></i>
+                <i class="fa-solid fa-battery-full hover:text-white cursor-pointer"></i>
+            </div>
+            <div class="text-right leading-tight px-2">
+                <div id="clock-time" class="text-xs font-bold">12:00</div>
+                <div id="clock-date" class="text-[10px] text-gray-400">10/24/2025</div>
+            </div>
+            <button class="h-full w-1 bg-white/20 ml-1 hover:bg-white/50 transition"></button>
+        </div>
+    </div>
+
+    <script>
+        /* --- CONFIG & APPS --- */
+        const apps = [
+            {
+                id: 'notepad',
+                name: 'Notepad',
+                icon: 'fa-regular fa-note-sticky',
+                color: 'text-yellow-400',
+                content: `<textarea class="w-full h-full bg-gray-900 text-white p-4 resize-none focus:outline-none font-mono text-sm" placeholder="Type something..."></textarea>`
+            },
+            {
+                id: 'calculator',
+                name: 'Calculator',
+                icon: 'fa-solid fa-calculator',
+                color: 'text-green-400',
+                width: 300,
+                height: 400,
+                content: `
+                    <div class="flex flex-col h-full bg-gray-800 p-2">
+                        <div id="calc-display" class="bg-gray-900 text-right text-3xl p-4 rounded mb-2 font-mono">0</div>
+                        <div class="grid grid-cols-4 gap-2 flex-1">
+                            <button onclick="calcOp('C')" class="bg-red-500/20 text-red-400 rounded hover:bg-red-500/40 transition">C</button>
+                            <button onclick="calcOp('/')" class="bg-white/10 rounded hover:bg-white/20 transition">÷</button>
+                            <button onclick="calcOp('*')" class="bg-white/10 rounded hover:bg-white/20 transition">×</button>
+                            <button onclick="calcOp('del')" class="bg-white/10 rounded hover:bg-white/20 transition">←</button>
+                            <button onclick="calcOp('7')" class="bg-white/5 rounded hover:bg-white/10 transition">7</button>
+                            <button onclick="calcOp('8')" class="bg-white/5 rounded hover:bg-white/10 transition">8</button>
+                            <button onclick="calcOp('9')" class="bg-white/5 rounded hover:bg-white/10 transition">9</button>
+                            <button onclick="calcOp('-')" class="bg-white/10 rounded hover:bg-white/20 transition">-</button>
+                            <button onclick="calcOp('4')" class="bg-white/5 rounded hover:bg-white/10 transition">4</button>
+                            <button onclick="calcOp('5')" class="bg-white/5 rounded hover:bg-white/10 transition">5</button>
+                            <button onclick="calcOp('6')" class="bg-white/5 rounded hover:bg-white/10 transition">6</button>
+                            <button onclick="calcOp('+')" class="bg-white/10 rounded hover:bg-white/20 transition">+</button>
+                            <button onclick="calcOp('1')" class="bg-white/5 rounded hover:bg-white/10 transition">1</button>
+                            <button onclick="calcOp('2')" class="bg-white/5 rounded hover:bg-white/10 transition">2</button>
+                            <button onclick="calcOp('3')" class="bg-white/5 rounded hover:bg-white/10 transition">3</button>
+                            <button onclick="calcOp('=')" class="bg-blue-500 rounded hover:bg-blue-600 row-span-2 flex items-center justify-center text-xl transition shadow-lg shadow-blue-500/50">=</button>
+                            <button onclick="calcOp('0')" class="bg-white/5 rounded hover:bg-white/10 col-span-2 transition">0</button>
+                            <button onclick="calcOp('.')" class="bg-white/5 rounded hover:bg-white/10 transition">.</button>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'browser',
+                name: 'Chrome',
+                icon: 'fa-brands fa-chrome',
+                color: 'text-blue-400',
+                width: 800,
+                height: 500,
+                content: `
+                    <div class="flex flex-col h-full bg-gray-100 text-gray-800">
+                        <div class="bg-gray-200 p-2 flex items-center gap-2 border-b border-gray-300">
+                            <div class="flex gap-2 text-gray-500">
+                                <i class="fa-solid fa-arrow-left hover:text-black cursor-pointer"></i>
+                                <i class="fa-solid fa-arrow-right hover:text-black cursor-pointer"></i>
+                                <i class="fa-solid fa-rotate-right hover:text-black cursor-pointer"></i>
+                            </div>
+                            <input type="text" value="https://google.com" class="flex-1 px-3 py-1 rounded-full border border-gray-300 text-sm outline-none focus:border-blue-500" readonly>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center justify-center bg-white p-10 text-center">
+                            <h1 class="text-4xl font-bold mb-4 text-slate-700"><span class="text-blue-500">G</span><span class="text-red-500">o</span><span class="text-yellow-500">o</span><span class="text-blue-500">g</span><span class="text-green-500">l</span><span class="text-red-500">e</span></h1>
+                            <div class="w-full max-w-md border border-gray-200 rounded-full shadow-md px-4 py-2 flex items-center hover:shadow-lg transition">
+                                <i class="fa-solid fa-magnifying-glass text-gray-400 mr-3"></i>
+                                <input type="text" class="flex-1 outline-none" placeholder="Search Google or type a URL">
+                            </div>
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'terminal',
+                name: 'Terminal',
+                icon: 'fa-solid fa-terminal',
+                color: 'text-gray-300',
+                width: 600,
+                height: 350,
+                content: `
+                    <div class="bg-black/95 backdrop-blur h-full text-green-400 font-mono p-2 text-sm overflow-auto" onclick="document.getElementById('term-input').focus()">
+                        <div class="mb-2">WebOS Kernel [v3.0.0-WOW]<br>Copyright (c) 2025 Web Systems Inc.</div>
+                        <div id="term-history"></div>
+                        <div class="flex">
+                            <span class="mr-2">user@webos:~$</span>
+                            <input id="term-input" type="text" class="bg-transparent border-none outline-none flex-1 text-green-400" autocomplete="off" onkeydown="handleTerminal(event)">
+                        </div>
+                    </div>`
+            },
+            {
+                id: 'vscode',
+                name: 'VS Code',
+                icon: 'fa-solid fa-code',
+                color: 'text-blue-500',
+                content: `<div class="h-full w-full bg-[#1e1e1e] flex text-gray-300 font-sans text-sm">
+                    <div class="w-12 border-r border-[#333] flex flex-col items-center py-2 gap-4 text-2xl text-gray-500">
+                         <i class="fa-regular fa-file text-white cursor-pointer hover:text-blue-400 transition"></i>
+                         <i class="fa-solid fa-magnifying-glass hover:text-white cursor-pointer transition"></i>
+                         <i class="fa-solid fa-code-branch hover:text-white cursor-pointer transition"></i>
+                    </div>
+                    <div class="w-48 border-r border-[#333] bg-[#252526] p-2">
+                        <div class="text-xs font-bold uppercase mb-2">Explorer</div>
+                        <div class="pl-2 hover:bg-[#37373d] cursor-pointer text-blue-300"><i class="fa-brands fa-js mr-1"></i> physics.js</div>
+                        <div class="pl-2 hover:bg-[#37373d] cursor-pointer text-yellow-300"><i class="fa-brands fa-html5 mr-1"></i> index.html</div>
+                    </div>
+                    <div class="flex-1 p-4 font-mono">
+                        <span class="text-pink-500">const</span> <span class="text-blue-400">enableGravity</span> = <span class="text-yellow-300">function</span>() {<br>
+                        &nbsp;&nbsp;<span class="text-blue-400">world</span>.<span class="text-yellow-300">explode</span>();<br>
+                        }
+                    </div>
+                </div>`
+            },
+            {
+                id: 'settings',
+                name: 'Settings',
+                icon: 'fa-solid fa-gear',
+                color: 'text-gray-400',
+                content: `<div class="h-full w-full bg-gray-900 text-white p-6">
+                    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+                    <div class="space-y-4">
+                        <button onclick="toggleGravity()" class="w-full flex items-center justify-between p-4 bg-gray-800 rounded hover:bg-gray-700 transition">
+                            <span>Gravity Mode</span>
+                            <span class="text-xs bg-blue-500 px-2 py-1 rounded">Try Me!</span>
+                        </button>
+                        <button onclick="changeWallpaper()" class="w-full flex items-center justify-between p-4 bg-gray-800 rounded hover:bg-gray-700 transition">
+                            <span>Change Wallpaper</span>
+                            <i class="fa-solid fa-image text-gray-400"></i>
+                        </button>
+                    </div>
+                </div>`
+            }
+        ];
+
+        let windows = [];
+        let zIndexCounter = 100;
+        let activeWindowId = null;
+        let gravityEnabled = false;
+        let gravityInterval = null;
+
+        /* --- INITIALIZATION --- */
+        window.onload = () => {
+            // Boot sequence
+            setTimeout(() => {
+                document.getElementById('boot-progress').style.width = '100%';
+            }, 100);
+            setTimeout(() => {
+                document.getElementById('boot-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('boot-screen').remove();
+                    showToast('Welcome to WebOS 3.0', 'System ready', 'fa-check-circle', 'text-green-400');
+                }, 800);
+            }, 2000);
+
+            initDesktop();
+            initStartMenu();
+            initContextMenu();
+            initParticles(); // Initialize the background effect
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Global click handling
+            document.addEventListener('click', (e) => {
+                const startMenu = document.getElementById('start-menu');
+                const startBtn = document.getElementById('start-btn');
+                const ctxMenu = document.getElementById('context-menu');
+
+                if (!startMenu.contains(e.target) && !startBtn.contains(e.target)) {
+                    startMenu.classList.remove('scale-100', 'opacity-100');
+                    startMenu.classList.add('scale-0', 'opacity-0');
+                }
+
+                // Hide context menu on click anywhere
+                if (!ctxMenu.contains(e.target)) {
+                    ctxMenu.classList.add('hidden');
+                }
+            });
+        };
+
+        /* --- VISUAL EFFECTS --- */
+        function initParticles() {
+            const canvas = document.getElementById('bg-canvas');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            let particles = [];
+
+            function resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.size = Math.random() * 2 + 1;
+                }
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0 || this.x > width) this.vx *= -1;
+                    if (this.y < 0 || this.y > height) this.vy *= -1;
+                }
+                draw() {
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            for (let i = 0; i < 50; i++) particles.push(new Particle());
+
+            // Mouse interaction
+            let mouse = { x: null, y: null };
+            window.addEventListener('mousemove', e => {
+                mouse.x = e.x;
+                mouse.y = e.y;
+            });
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+                particles.forEach(p => {
+                    p.update();
+                    p.draw();
+
+                    // Draw lines
+                    particles.forEach(p2 => {
+                        const dx = p.x - p2.x;
+                        const dy = p.y - p2.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 100) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(255,255,255,${0.1 - dist / 1000})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
+                    });
+
+                    // Mouse connect
+                    if (mouse.x) {
+                        const dx = p.x - mouse.x;
+                        const dy = p.y - mouse.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 150) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(100, 200, 255, ${0.3 - dist / 500})`;
+                            ctx.lineWidth = 1;
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(mouse.x, mouse.y);
+                            ctx.stroke();
+                        }
+                    }
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        function showToast(title, message, icon = 'fa-info-circle', color = 'text-blue-400') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast bg-gray-800/90 backdrop-blur border border-white/10 text-white px-4 py-3 rounded-lg shadow-2xl flex items-start gap-3 min-w-[250px] pointer-events-auto';
+            toast.innerHTML = `
+                <i class="fa-solid ${icon} ${color} mt-1"></i>
+                <div>
+                    <div class="font-bold text-sm">${title}</div>
+                    <div class="text-xs text-gray-300">${message}</div>
+                </div>
+            `;
+            container.appendChild(toast);
+
+            // Play sound effect (simulated)
+            // In a real app, new Audio('pop.mp3').play();
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        let wallpaperIdx = 1;
+        function changeWallpaper() {
+            const body = document.getElementById('main-body');
+            body.classList.remove(`wallpaper-${wallpaperIdx}`);
+            wallpaperIdx = (wallpaperIdx % 3) + 1;
+            body.classList.add(`wallpaper-${wallpaperIdx}`);
+            showToast('Wallpaper Changed', `Applied theme #${wallpaperIdx}`, 'fa-image', 'text-pink-400');
+        }
+
+        function initContextMenu() {
+            document.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                const menu = document.getElementById('context-menu');
+                menu.style.left = e.clientX + 'px';
+                menu.style.top = e.clientY + 'px';
+                menu.classList.remove('hidden');
+
+                // Adjust if off screen
+                const rect = menu.getBoundingClientRect();
+                if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 10) + 'px';
+                if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 10) + 'px';
+            });
+        }
+
+        /* --- GRAVITY ENGINE --- */
+        function toggleGravity() {
+            gravityEnabled = !gravityEnabled;
+            const text = document.getElementById('gravity-text');
+
+            if (gravityEnabled) {
+                text.innerText = "Disable Gravity";
+                showToast('Gravity Enabled', 'Windows will now fall!', 'fa-apple-whole', 'text-orange-500');
+                startGravityLoop();
+                // Add class to all windows
+                windows.forEach(w => w.el.classList.add('gravity-mode'));
+            } else {
+                text.innerText = "Enable Gravity";
+                showToast('Gravity Disabled', 'Zero-G restored', 'fa-ban', 'text-gray-400');
+                stopGravityLoop();
+                windows.forEach(w => w.el.classList.remove('gravity-mode'));
+            }
+        }
+
+        function startGravityLoop() {
+            if (gravityInterval) return;
+
+            // Initialize physics props for existing windows
+            windows.forEach(w => {
+                if (!w.vx) {
+                    w.vx = (Math.random() - 0.5) * 10; // Random throw
+                    w.vy = 0;
+                }
+            });
+
+            gravityInterval = setInterval(() => {
+                const gravity = 0.8;
+                const friction = 0.7;
+                const bounce = 0.6;
+                const bottom = window.innerHeight - 48; // Taskbar height
+
+                windows.forEach(w => {
+                    if (w.minimized || w.maximized || w.isDragging) return;
+
+                    // Apply gravity
+                    w.vy += gravity;
+
+                    // Update pos
+                    let top = parseFloat(w.el.style.top);
+                    let left = parseFloat(w.el.style.left);
+                    let h = w.el.offsetHeight;
+                    let width = w.el.offsetWidth;
+
+                    top += w.vy;
+                    left += w.vx;
+
+                    // Floor collision
+                    if (top + h > bottom) {
+                        top = bottom - h;
+                        w.vy *= -bounce;
+                        w.vx *= friction; // Friction on floor
+
+                        // Stop if slow
+                        if (Math.abs(w.vy) < 1) w.vy = 0;
+                    }
+
+                    // Wall collision
+                    if (left < 0) {
+                        left = 0;
+                        w.vx *= -bounce;
+                    }
+                    if (left + width > window.innerWidth) {
+                        left = window.innerWidth - width;
+                        w.vx *= -bounce;
+                    }
+
+                    w.el.style.top = top + 'px';
+                    w.el.style.left = left + 'px';
+
+                    // Save state
+                    w.vx *= 0.99; // Air resistance
+                });
+            }, 16); // 60fps
+        }
+
+        function stopGravityLoop() {
+            clearInterval(gravityInterval);
+            gravityInterval = null;
+            // Reset windows upright slightly? No, let them stay where they landed.
+        }
+
+        /* --- UI GENERATORS --- */
+        function initDesktop() {
+            const desktop = document.getElementById('desktop-icons');
+            apps.forEach(app => {
+                const icon = document.createElement('div');
+                icon.className = 'flex flex-col items-center justify-center p-2 w-24 rounded hover:bg-white/10 cursor-pointer transition duration-300 group relative';
+                icon.onclick = () => openApp(app.id);
+                icon.innerHTML = `
+                    <div class="w-12 h-12 bg-gray-800/80 backdrop-blur-md rounded-xl flex items-center justify-center text-2xl shadow-lg mb-1 group-hover:scale-110 group-hover:rotate-3 transition duration-300 ${app.color} ring-1 ring-white/10">
+                        <i class="${app.icon}"></i>
+                    </div>
+                    <span class="text-xs text-white text-center drop-shadow-md font-medium bg-black/20 px-2 rounded-full mt-1">${app.name}</span>
+                `;
+                desktop.appendChild(icon);
+            });
+        }
+
+        function initStartMenu() {
+            const menu = document.getElementById('start-menu-apps');
+            const btn = document.getElementById('start-btn');
+            const menuContainer = document.getElementById('start-menu');
+
+            btn.onclick = () => {
+                if (menuContainer.classList.contains('scale-0')) {
+                    menuContainer.classList.remove('scale-0', 'opacity-0');
+                    menuContainer.classList.add('scale-100', 'opacity-100');
+                } else {
+                    menuContainer.classList.add('scale-0', 'opacity-0');
+                    menuContainer.classList.remove('scale-100', 'opacity-100');
+                }
+            };
+
+            apps.forEach(app => {
+                const item = document.createElement('button');
+                item.className = 'flex items-center gap-3 p-2 w-full hover:bg-white/10 rounded text-left transition group';
+                item.onclick = () => {
+                    openApp(app.id);
+                    menuContainer.classList.add('scale-0', 'opacity-0');
+                    menuContainer.classList.remove('scale-100', 'opacity-100');
+                };
+                item.innerHTML = `
+                    <div class="w-8 h-8 bg-gray-700 rounded flex items-center justify-center ${app.color} group-hover:scale-110 transition">
+                        <i class="${app.icon}"></i>
+                    </div>
+                    <span class="text-sm font-medium">${app.name}</span>
+                `;
+                menu.appendChild(item);
+            });
+        }
+
+        /* --- WINDOW MANAGEMENT --- */
+        function openApp(appId) {
+            const existing = windows.find(w => w.id === appId);
+            if (existing) {
+                restoreWindow(appId);
+                focusWindow(appId);
+                return;
+            }
+
+            const app = apps.find(a => a.id === appId);
+            const id = app.id;
+
+            const top = 50 + (Math.random() * 100);
+            const left = 50 + (Math.random() * 200);
+            const width = app.width || 500;
+            const height = app.height || 400;
+
+            const winEl = document.createElement('div');
+            winEl.id = `win-${id}`;
+            winEl.className = `window absolute bg-gray-900/95 rounded-lg overflow-hidden border border-gray-600/50 flex flex-col pointer-events-auto ${gravityEnabled ? 'gravity-mode' : ''}`;
+            winEl.style.width = width + 'px';
+            winEl.style.height = height + 'px';
+            winEl.style.top = top + 'px';
+            winEl.style.left = left + 'px';
+            winEl.style.zIndex = ++zIndexCounter;
+
+            // Animation entering
+            winEl.style.transform = 'scale(0.8) translateY(20px)';
+            winEl.style.opacity = '0';
+            setTimeout(() => {
+                winEl.style.transform = 'scale(1) translateY(0)';
+                winEl.style.opacity = '1';
+            }, 10);
+
+            winEl.innerHTML = `
+                <div class="h-9 bg-gray-800/50 border-b border-white/10 flex items-center justify-between px-3 cursor-default select-none" onmousedown="startDrag(event, '${id}')">
+                    <div class="flex items-center gap-2">
+                        <i class="${app.icon} ${app.color} text-sm"></i>
+                        <span class="text-xs font-medium text-gray-300">${app.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="minimizeWindow('${id}')" class="hover:text-white text-gray-500 transition w-6 h-6 flex items-center justify-center rounded hover:bg-white/10"><i class="fa-solid fa-minus"></i></button>
+                        <button onclick="maximizeWindow('${id}')" class="hover:text-white text-gray-500 transition w-6 h-6 flex items-center justify-center rounded hover:bg-white/10"><i class="fa-regular fa-square"></i></button>
+                        <button onclick="closeWindow('${id}')" class="hover:bg-red-500 hover:text-white text-gray-500 w-6 h-6 rounded flex items-center justify-center transition"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+                <div class="flex-1 relative overflow-hidden">
+                    <div class="absolute inset-0 overflow-auto" onmousedown="event.stopPropagation(); focusWindow('${id}')">
+                        ${app.content}
+                    </div>
+                    <!-- Resize handle -->
+                    <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50"></div>
+                </div>
+            `;
+
+            document.getElementById('window-area').appendChild(winEl);
+
+            const taskItem = document.createElement('button');
+            taskItem.id = `task-${id}`;
+            taskItem.className = 'h-10 w-10 flex items-center justify-center rounded hover:bg-white/10 bg-white/10 relative group transition duration-300';
+            taskItem.onclick = () => toggleMinimize(id);
+            taskItem.innerHTML = `
+                <i class="${app.icon} ${app.color} text-xl transform group-hover:-translate-y-1 transition duration-300"></i>
+                <div class="absolute -bottom-1 w-1 h-1 bg-blue-400 rounded-full transition-all group-hover:w-3"></div>
+                <div class="absolute -top-12 left-1/2 -translate-x-1/2 bg-gray-800 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none border border-gray-700 shadow-lg transform translate-y-2 group-hover:translate-y-0">${app.name}</div>
+            `;
+            document.getElementById('taskbar-apps').appendChild(taskItem);
+
+            showToast('App Launched', `Opened ${app.name}`, app.icon.split(' ')[1], 'text-white');
+
+            windows.push({
+                id: id,
+                el: winEl,
+                maximized: false,
+                vx: 0,
+                vy: 0,
+                isDragging: false
+            });
+            focusWindow(id);
+        }
+
+        function closeWindow(id) {
+            const win = document.getElementById(`win-${id}`);
+            const task = document.getElementById(`task-${id}`);
+            win.style.transform = "scale(0.9) translateY(20px)";
+            win.style.opacity = "0";
+            setTimeout(() => win.remove(), 200);
+            if (task) {
+                task.classList.add('scale-0');
+                setTimeout(() => task.remove(), 200);
+            }
+            windows = windows.filter(w => w.id !== id);
+        }
+
+        function minimizeWindow(id) {
+            const win = document.getElementById(`win-${id}`);
+            win.classList.add('minimized');
+            document.getElementById(`task-${id}`).classList.remove('bg-white/10');
+            document.getElementById(`task-${id}`).classList.add('opacity-50');
+        }
+
+        function restoreWindow(id) {
+            const win = document.getElementById(`win-${id}`);
+            win.classList.remove('minimized');
+            document.getElementById(`task-${id}`).classList.add('bg-white/10');
+            document.getElementById(`task-${id}`).classList.remove('opacity-50');
+        }
+
+        function toggleMinimize(id) {
+            const win = document.getElementById(`win-${id}`);
+            if (win.classList.contains('minimized')) {
+                restoreWindow(id);
+                focusWindow(id);
+            } else {
+                if (activeWindowId === id) {
+                    minimizeWindow(id);
+                } else {
+                    focusWindow(id);
+                }
+            }
+        }
+
+        function maximizeWindow(id) {
+            const winObj = windows.find(w => w.id === id);
+            const winEl = winObj.el;
+
+            if (winObj.maximized) {
+                winEl.classList.remove('maximized');
+                winObj.maximized = false;
+            } else {
+                winEl.classList.add('maximized');
+                winObj.maximized = true;
+            }
+            focusWindow(id);
+        }
+
+        function focusWindow(id) {
+            activeWindowId = id;
+            const win = document.getElementById(`win-${id}`);
+            if (win) {
+                win.style.zIndex = ++zIndexCounter;
+                document.querySelectorAll('#taskbar-apps button').forEach(b => b.classList.remove('bg-white/20', 'ring-1', 'ring-white/20'));
+                const task = document.getElementById(`task-${id}`);
+                if (task) task.classList.add('bg-white/20', 'ring-1', 'ring-white/20');
+            }
+        }
+
+        /* --- DRAGGING LOGIC --- */
+        let dragId = null;
+        let startX, startY, initialLeft, initialTop;
+        let lastX, lastY; // For calculating throw velocity
+
+        function startDrag(e, id) {
+            if (e.target.closest('button')) return;
+
+            const winObj = windows.find(w => w.id === id);
+            if (winObj.maximized) return;
+
+            focusWindow(id);
+            dragId = id;
+            winObj.isDragging = true;
+
+            // Reset Physics
+            winObj.vx = 0;
+            winObj.vy = 0;
+
+            startX = e.clientX;
+            startY = e.clientY;
+            lastX = e.clientX;
+            lastY = e.clientY;
+
+            const rect = winObj.el.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+
+            winObj.el.classList.add('dragging');
+
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function onDrag(e) {
+            if (!dragId) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            // Velocity Calculation
+            const winObj = windows.find(w => w.id === dragId);
+            if (gravityEnabled) {
+                winObj.vx = (e.clientX - lastX) * 1.5; // Boost throw
+                winObj.vy = (e.clientY - lastY) * 1.5;
+            }
+            lastX = e.clientX;
+            lastY = e.clientY;
+
+            const win = document.getElementById(`win-${dragId}`);
+            win.style.left = `${initialLeft + dx}px`;
+            win.style.top = `${initialTop + dy}px`;
+        }
+
+        function stopDrag() {
+            if (dragId) {
+                const winObj = windows.find(w => w.id === dragId);
+                winObj.isDragging = false;
+                document.getElementById(`win-${dragId}`).classList.remove('dragging');
+                dragId = null;
+            }
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        /* --- UTILITIES --- */
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock-time').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('clock-date').innerText = now.toLocaleDateString();
+        }
+
+        let calcDisplay = "0";
+        function calcOp(val) {
+            const display = document.getElementById('calc-display');
+            if (val === 'C') {
+                calcDisplay = "0";
+            } else if (val === 'del') {
+                calcDisplay = calcDisplay.length > 1 ? calcDisplay.slice(0, -1) : "0";
+            } else if (val === '=') {
+                try {
+                    calcDisplay = eval(calcDisplay).toString();
+                } catch {
+                    calcDisplay = "Error";
+                }
+            } else {
+                if (calcDisplay === "0" && !['.', '/', '*', '+', '-'].includes(val)) calcDisplay = val;
+                else calcDisplay += val;
+            }
+            display.innerText = calcDisplay;
+        }
+
+        function handleTerminal(e) {
+            if (e.key === 'Enter') {
+                const input = e.target.value;
+                const history = document.getElementById('term-history');
+                const line = document.createElement('div');
+                line.innerHTML = `<span class="text-green-500">user@webos:~$</span> ${input}`;
+                history.appendChild(line);
+
+                let response = "";
+                if (input === 'help') response = "Commands: help, gravity, wallpaper, clear, date, echo";
+                else if (input === 'gravity') toggleGravity();
+                else if (input === 'wallpaper') changeWallpaper();
+                else if (input === 'clear') history.innerHTML = "";
+                else if (input === 'date') response = new Date().toString();
+                else if (input.startsWith('echo ')) response = input.substring(5);
+                else if (input.trim() !== "") response = `zsh: command not found: ${input}`;
+
+                if (response) {
+                    const respLine = document.createElement('div');
+                    respLine.className = "text-gray-300 mb-2";
+                    respLine.innerText = response;
+                    history.appendChild(respLine);
+                }
+                e.target.value = "";
+                e.target.scrollIntoView();
+            }
+        }
+    </script>
+</body>
+
+</html>
