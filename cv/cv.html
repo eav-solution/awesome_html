@@ -20,6 +20,10 @@
             --text-light: #64748b;
             --text-white: #ffffff;
             --border-color: #e2e8f0;
+            --sidebar-bg: #f8fafc;
+            /* NEW: Light Sidebar Background */
+            --sidebar-text: #334155;
+            /* NEW: Dark Sidebar Text */
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
@@ -31,7 +35,7 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
+            background-color: #f1f5f9;
             color: var(--text-dark);
             line-height: 1.6;
             font-size: 14px;
@@ -48,46 +52,46 @@
             min-height: 297mm;
         }
 
-        /* LEFT SIDEBAR */
+        /* --- LEFT SIDEBAR (LIGHT THEME) --- */
         aside {
-            background-color: var(--secondary-color);
-            color: var(--text-white);
+            background-color: var(--sidebar-bg);
+            /* Changed to Light */
+            color: var(--sidebar-text);
+            /* Changed to Dark */
             padding: 40px 25px;
             display: flex;
             flex-direction: column;
             gap: 30px;
+            border-right: 1px solid var(--border-color);
+            /* Added separator line */
         }
 
-        /* --- PHẦN CHỈNH SỬA QUAN TRỌNG CHO ẢNH --- */
+        /* --- AVATAR (RECTANGLE) --- */
         .profile-img-container {
             width: 160px;
-            /* Kích thước khung tròn */
-            height: 160px;
+            height: 210px;
+            /* Portrait Rectangle */
             margin-bottom: 20px;
-            border-radius: 50%;
-            /* Tạo hình tròn */
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            /* Viền mờ xung quanh */
+            border-radius: 12px;
+            /* Rounded corners */
+            border: 4px solid #ffffff;
+            /* White border */
             overflow: hidden;
-            /* Cắt phần ảnh thừa ra ngoài hình tròn */
-            background-color: #334155;
-            /* Màu nền dự phòng nếu ảnh lỗi */
+            background-color: #e2e8f0;
+            /* Light placeholder */
             display: flex;
             justify-content: center;
             align-items: center;
+            box-shadow: var(--shadow);
         }
 
         .profile-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* KEY: Zoom ảnh để lấp đầy khung tròn */
             object-position: top center;
-            /* Ưu tiên lấy phần trên (khuôn mặt) */
             display: block;
         }
-
-        /* ------------------------------------------- */
 
         aside h2 {
             font-size: 16px;
@@ -97,18 +101,23 @@
             padding-bottom: 10px;
             margin-bottom: 15px;
             color: var(--primary-color);
+            font-weight: 800;
         }
 
         .contact-info div {
             margin-bottom: 15px;
             font-size: 13px;
+            color: var(--text-dark);
+            /* Ensure text is dark */
         }
 
         .contact-info strong {
             display: block;
-            color: #94a3b8;
+            color: #64748b;
+            /* Medium Grey for labels */
             font-size: 11px;
             margin-bottom: 2px;
+            text-transform: uppercase;
         }
 
         .skill-list {
@@ -117,11 +126,16 @@
             gap: 8px;
         }
 
+        /* Updated Skill Tag for Light Background */
         .skill-tag {
-            background: rgba(255, 255, 255, 0.1);
+            background: #e2e8f0;
+            /* Darker Grey background */
+            color: var(--secondary-color);
+            /* Dark text */
             padding: 4px 10px;
             border-radius: 4px;
             font-size: 12px;
+            font-weight: 600;
         }
 
         .edu-block {
@@ -130,12 +144,14 @@
 
         .edu-date {
             font-size: 12px;
-            color: #94a3b8;
+            color: #64748b;
             margin-bottom: 4px;
+            font-weight: 600;
         }
 
         .edu-school {
             font-weight: 700;
+            color: var(--text-dark);
         }
 
         /* RIGHT CONTENT */
@@ -179,7 +195,7 @@
             content: '';
             flex: 1;
             height: 2px;
-            background: var(--accent-color);
+            background: var(--border-color);
         }
 
         .profile-summary {
@@ -297,6 +313,8 @@
                 flex-direction: row;
                 flex-wrap: wrap;
                 justify-content: space-between;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
             }
 
             .sidebar-section {
@@ -321,13 +339,14 @@
                 max-width: 100%;
             }
 
-            .project-card {
-                break-inside: avoid;
-            }
-
             aside {
+                background-color: #f8fafc !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+            }
+
+            .project-card {
+                break-inside: avoid;
             }
         }
     </style>
@@ -346,7 +365,7 @@
                 <div class="contact-info">
                     <div>
                         <strong>Address</strong>
-                        Mai Van Vinh Street, Ward Tan Quy, District 7, Ho Chi Minh City
+                        District 7, Ho Chi Minh City
                     </div>
                     <div>
                         <strong>Phone</strong>
@@ -365,7 +384,7 @@
                     <div class="edu-date">Sep 2014 – June 2018</div>
                     <div class="edu-school">Can Tho University</div>
                     <div style="font-size: 13px; margin-top: 2px;">Bachelor's degree</div>
-                    <div style="font-size: 13px; font-style: italic;">Communication and networking</div>
+                    <div style="font-size: 13px; font-style: italic; color: #64748b;">Communication and networking</div>
                 </div>
             </div>
 
