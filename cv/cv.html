@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV - Lam Kha Tinh | AI Engineer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            /* Royal Blue */
+            --secondary-color: #1e293b;
+            /* Slate Dark */
+            --accent-color: #f1f5f9;
+            /* Light Gray */
+            --text-dark: #0f172a;
+            --text-light: #64748b;
+            --text-white: #ffffff;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: var(--text-dark);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        /* A4 Paper Layout */
+        .page {
+            max-width: 210mm;
+            margin: 40px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            display: grid;
+            grid-template-columns: 30% 70%;
+            min-height: 297mm;
+        }
+
+        /* LEFT SIDEBAR */
+        aside {
+            background-color: var(--secondary-color);
+            color: var(--text-white);
+            padding: 40px 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* --- PHẦN CHỈNH SỬA QUAN TRỌNG CHO ẢNH --- */
+        .profile-img-container {
+            width: 160px;
+            /* Kích thước khung tròn */
+            height: 160px;
+            margin-bottom: 20px;
+            border-radius: 50%;
+            /* Tạo hình tròn */
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            /* Viền mờ xung quanh */
+            overflow: hidden;
+            /* Cắt phần ảnh thừa ra ngoài hình tròn */
+            background-color: #334155;
+            /* Màu nền dự phòng nếu ảnh lỗi */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .profile-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* KEY: Zoom ảnh để lấp đầy khung tròn */
+            object-position: top center;
+            /* Ưu tiên lấy phần trên (khuôn mặt) */
+            display: block;
+        }
+
+        /* ------------------------------------------- */
+
+        aside h2 {
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+
+        .contact-info div {
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .contact-info strong {
+            display: block;
+            color: #94a3b8;
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+
+        .skill-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .skill-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .edu-block {
+            margin-bottom: 15px;
+        }
+
+        .edu-date {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .edu-school {
+            font-weight: 700;
+        }
+
+        /* RIGHT CONTENT */
+        main {
+            padding: 40px;
+        }
+
+        header {
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--text-dark);
+            line-height: 1.2;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .job-title {
+            font-size: 18px;
+            color: var(--primary-color);
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--secondary-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 30px 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 2px;
+            background: var(--accent-color);
+        }
+
+        .profile-summary {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
+
+        /* Timeline Experience */
+        .experience-item {
+            position: relative;
+            padding-left: 20px;
+            border-left: 2px solid var(--border-color);
+            margin-bottom: 40px;
+        }
+
+        .experience-item::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 0;
+            width: 10px;
+            height: 10px;
+            background: var(--primary-color);
+            border-radius: 50%;
+        }
+
+        .exp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+        }
+
+        .company-name {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .exp-date {
+            font-size: 13px;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .exp-role {
+            font-size: 15px;
+            font-style: italic;
+            color: var(--text-light);
+            margin-bottom: 10px;
+        }
+
+        .exp-desc ul {
+            list-style-type: none;
+            margin-bottom: 15px;
+        }
+
+        .exp-desc li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 5px;
+            color: var(--text-dark);
+        }
+
+        .exp-desc li::before {
+            content: '•';
+            color: var(--primary-color);
+            position: absolute;
+            left: 0;
+        }
+
+        /* Projects Section within Experience */
+        .projects-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .project-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            transition: transform 0.2s;
+        }
+
+        .project-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow);
+        }
+
+        .project-title {
+            font-weight: 700;
+            color: var(--secondary-color);
+            font-size: 14px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .project-desc {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .page {
+                grid-template-columns: 1fr;
+                margin: 0;
+                width: 100%;
+            }
+
+            aside {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: space-between;
+            }
+
+            .sidebar-section {
+                width: 45%;
+            }
+
+            .profile-img-container {
+                margin-right: auto;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .page {
+                margin: 0;
+                box-shadow: none;
+                border: none;
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .project-card {
+                break-inside: avoid;
+            }
+
+            aside {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="page">
+        <aside>
+            <div class="sidebar-section">
+                <div class="profile-img-container">
+                    <img src="avt.png" alt="Lam Kha Tinh" class="profile-img">
+                </div>
+
+                <h2>Contact</h2>
+                <div class="contact-info">
+                    <div>
+                        <strong>Address</strong>
+                        Mai Van Vinh Street, Ward Tan Quy, District 7, Ho Chi Minh City
+                    </div>
+                    <div>
+                        <strong>Phone</strong>
+                        0963366093
+                    </div>
+                    <div>
+                        <strong>Email</strong>
+                        lktinh2018@gmail.com
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Education</h2>
+                <div class="edu-block">
+                    <div class="edu-date">Sep 2014 – June 2018</div>
+                    <div class="edu-school">Can Tho University</div>
+                    <div style="font-size: 13px; margin-top: 2px;">Bachelor's degree</div>
+                    <div style="font-size: 13px; font-style: italic;">Communication and networking</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Skills</h2>
+                <div class="skill-list">
+                    <span class="skill-tag">FastAPI (Python)</span>
+                    <span class="skill-tag">LLM/VLM</span>
+                    <span class="skill-tag">Langchain/Langgraph</span>
+                    <span class="skill-tag">RAG - Vector Search</span>
+                    <span class="skill-tag">Automation Workflow</span>
+                    <span class="skill-tag">Flutter - Firebase</span>
+                    <span class="skill-tag">Docker & Containerization</span>
+                    <span class="skill-tag">CI/CD</span>
+                    <span class="skill-tag">Linux & Shell</span>
+                    <span class="skill-tag">System Design</span>
+                    <span class="skill-tag">Teamwork</span>
+                    <span class="skill-tag">Time Management</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Hobbies</h2>
+                <div class="skill-list">
+                    <span class="skill-tag">Technology</span>
+                    <span class="skill-tag">Optimization</span>
+                    <span class="skill-tag">Investigation</span>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h2>Awards</h2>
+                <div style="font-size: 13px; margin-bottom: 10px;">
+                    <strong>2017</strong><br>
+                    The second prize in olympic copetition with open source subject.
+                </div>
+                <div style="font-size: 13px;">
+                    <strong>Q1 2025</strong><br>
+                    Best employee (FreeC).
+                </div>
+            </div>
+        </aside>
+
+        <main>
+            <header>
+                <h1>LAM KHA TINH</h1>
+                <div class="job-title">SENIOR AI ENGINEER</div>
+            </header>
+
+            <section>
+                <div class="section-title">Profile</div>
+                <p class="profile-summary">
+                    I'm a senior AI engineer with 7+ years experience delivering intelligent solutions—LLM automation,
+                    vision, RAG chatbots, test generation, and edge deployments. Skilled at building and scaling AI
+                    workflows, sharing knowledge through internal workshops and documentation, and enabling cross-team
+                    adoption of AI technologies.
+                </p>
+            </section>
+
+            <section>
+                <div class="section-title">Experience & Projects</div>
+
+                <div class="experience-item">
+                    <div class="exp-header">
+                        <div class="company-name">FreeC Asia</div>
+                        <div class="exp-date">Mar 2024 – Present</div>
+                    </div>
+                    <div class="exp-role">Senior AI Software Engineer</div>
+                    <div class="exp-desc">
+                        <ul>
+                            <li>Architect and implement AI-first solutions customized for enterprise clients, chaining
+                                vision, language, and retrieval components into production pipelines.</li>
+                            <li>Design and implement AI workflows optimized for various projects.</li>
+                            <li>Build and optimize Python backend services using FastAPI; containerize and deploy with
+                                Docker for reliability and scalability.</li>
+                            <li>Design automation workflows that embed LLM feedback loops, reducing manual tuning and
+                                enabling self-improving test generation/inference.</li>
+                            <li>Share AI best practices across teams by running workshops, creating clear documentation,
+                                and pairing with other engineers so non-AI teams can use AI tools more efficiently.</li>
+                        </ul>
+
+                        <div class="projects-container">
+                            <div class="project-card">
+                                <span class="project-title">1/ Test Case Generation</span>
+                                <div class="project-desc">Built an LLM-driven system that ingests natural-language
+                                    requirement descriptions and outputs structured test cases. Implemented export to
+                                    Excel (.xlsx) for immediate QA consumption.</div>
+                            </div>
+                            <div class="project-card">
+                                <span class="project-title">2/ AI GitHub Pull Request Code Assistant</span>
+                                <div class="project-desc">Developed an intelligent PR assistant using multi-agent
+                                    workflow and MCP sandbox to analyze diffs, detect risks, style violations, and
+                                    suggest code edits or auto-generated fix commits.</div>
+                            </div>
+                            <div class="project-card">
+                                <span class="project-title">3/ AI Image Generation – Japanese-style Face Swap</span>
+                                <div class="project-desc">Designed a pipeline using diffusion-based generative models
+                                    (Flux + LoRA) to transfer faces into Japanese girls styles while preserving identity
+                                    and ethics.</div>
+                            </div>
+                            <div class="project-card">
+                                <span class="project-title">4/ Deloitte – Intelligent Excel Assistant</span>
+                                <div class="project-desc">Built a smart Excel add-in using context-aware LLMs to
+                                    translate natural language prompts into complex formulas and logic.</div>
+                            </div>
+                            <div class="project-card">
+                                <span class="project-title">5/ Deloitte - AI Portal ChatBot</span>
+                                <div class="project-desc">Developing and optimizing RAG-based chatbot systems for
+                                    intelligent document retrieval.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="experience-item">
+                    <div class="exp-header">
+                        <div class="company-name">Nexle Corporation</div>
+                        <div class="exp-date">Mar 2023 – Mar 2024</div>
+                    </div>
+                    <div class="exp-role">Senior AI Software Engineer</div>
+                    <div class="exp-desc">
+                        <ul>
+                            <li>Build AI solutions for customers and implement suitable AI workflows.</li>
+                            <li>Work with Flutter to create GUI for AI applications.</li>
+                            <li>Work with Python backend to create AI server and Dockerize apps.</li>
+                        </ul>
+                        <div class="projects-container">
+                            <div class="project-card">
+                                <span class="project-title">1/ GPT ChatBot</span>
+                                <div class="project-desc">Built AI chatbot using GPT model for finance/customer support.
+                                    Built UI with Flutter and FastAPI backend. Investigated LLAMA-2 for ChatGPT
+                                    alternative.</div>
+                            </div>
+                            <div class="project-card">
+                                <span class="project-title">2/ Retahub</span>
+                                <div class="project-desc">Built AI system for retailers using IP cameras to count
+                                    people, detect fire, and blacklist faces. Used ZMQ protocol and investigated Firefly
+                                    board for cost-effective deployment.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="experience-item">
+                    <div class="exp-header">
+                        <div class="company-name">Digital Media Professionals Vietnam</div>
+                        <div class="exp-date">Jun 2019 – Mar 2023</div>
+                    </div>
+                    <div class="exp-role">Senior AI Software Engineer</div>
+                    <div class="exp-desc">
+                        <ul>
+                            <li>Worked with Yamaha, Docomo to create AI solutions.</li>
+                            <li>Experienced in system optimization (hardware utilization/flow structure).</li>
+                            <li>Hands-on with Deep Learning models (Object Detection, Segmentation, Classification, Pose
+                                Estimation).</li>
+                            <li>Extensive experience porting models to edge devices (Xavier, FPGA).</li>
+                        </ul>
+                        <div class="projects-container">
+                            <div class="project-card">
+                                <span class="project-title">Key Projects Overview</span>
+                                <div class="project-desc">
+                                    <strong>Face Recognition:</strong> TensorFlow Lite on mobile, Flutter App.<br>
+                                    <strong>Anomaly Detection:</strong> Desktop App (Flutter), UI for AI Backend.<br>
+                                    <strong>Abnormal Behavior Detection:</strong> Train security (knife, fire, fighting)
+                                    using YoloX with optical flow.<br>
+                                    <strong>Exhibition Demo:</strong> AR application with object/action recognition.<br>
+                                    <strong>Drone Project:</strong> Depth estimation, tracking, TensorRT
+                                    optimization.<br>
+                                    <strong>Number Plate Recognition:</strong> Parking system using Yolo.<br>
+                                    <strong>Driver Monitoring:</strong> Hand tracking on wheel using
+                                    segmentation/contours.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="experience-item" style="border-left: none;">
+                    <div class="exp-header">
+                        <div class="company-name">Renesas Design Vietnam</div>
+                        <div class="exp-date">Jun 2018 – Jun 2019</div>
+                    </div>
+                    <div class="exp-role">Fresher Embedded Software Engineer</div>
+                    <div class="exp-desc">
+                        <ul>
+                            <li>Porting driver for image processing module. Testing driver for FPGA board.</li>
+                        </ul>
+                        <div class="projects-container">
+                            <div class="project-card">
+                                <span class="project-title">Projects</span>
+                                <div class="project-desc">
+                                    <strong>OS Testing:</strong> Code coverage for drivers, integrity testing for
+                                    FPGA.<br>
+                                    <strong>IMR Driver Porting:</strong> Ported image processing driver for FPGA board;
+                                    created customer demos.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+</body>
+
+</html>
