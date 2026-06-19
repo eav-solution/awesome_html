@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>3D Particle System - Gesture Control v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', sans-serif;
+            color: #fff;
+        }
+
+        #threeCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #cameraContainer {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 280px;
+            height: 210px;
+            border: 2px solid #00ffff;
+            border-radius: 12px;
+            z-index: 10;
+            overflow: hidden;
+            background: #111;
+            box-shadow: 0 4px 20px rgba(0, 255, 255, 0.3);
+        }
+
+        #cameraPreview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #handCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+
+        #fingerDebug {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-family: monospace;
+            pointer-events: none;
+        }
+
+        #statusPanel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 16px 24px;
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            font-size: 14px;
+            line-height: 1.9;
+            min-width: 240px;
+        }
+
+        #statusPanel .gesture {
+            font-weight: bold;
+            color: #00ffff;
+            font-size: 18px;
+            display: block;
+            margin-top: 4px;
+        }
+
+        #cameraWarning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 50, 50, 0.95);
+            padding: 30px 50px;
+            border-radius: 16px;
+            z-index: 100;
+            text-align: center;
+            max-width: 600px;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.5);
+        }
+
+        #cameraWarning h2 {
+            margin-bottom: 15px;
+        }
+
+        #cameraWarning code {
+            background: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        #cameraWarning ol {
+            text-align: left;
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .instructions {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(255, 0, 255, 0.4);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            font-size: 13px;
+            line-height: 1.8;
+            max-width: 300px;
+        }
+
+        .instructions h3 {
+            color: #ff00ff;
+            margin-bottom: 8px;
+        }
+
+        .key {
+            display: inline-block;
+            background: #333;
+            border: 1px solid #666;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            min-width: 22px;
+            text-align: center;
+            color: #00ffff;
+        }
+
+        .finger-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #333;
+            margin: 0 2px;
+            border: 1px solid #666;
+            vertical-align: middle;
+        }
+
+        .finger-indicator.active {
+            background: #00ff00;
+            box-shadow: 0 0 8px #00ff00;
+            border-color: #00ff00;
+        }
+
+        #fingerPanel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(0, 255, 0, 0.4);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            font-size: 13px;
+        }
+
+        #fingerPanel h4 {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+
+        .finger-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="cameraWarning">
+        <h2>⚠️ Camera đang khởi động</h2>
+        <p>Để camera hoạt động, bạn PHẢI chạy file qua local server:</p>
+        <ol>
+            <li>Mở Terminal tại thư mục chứa file HTML</li>
+            <li>Chạy: <code>python3 -m http.server 8000</code></li>
+            <li>Truy cập: <code>http://localhost:8000</code></li>
+            <li>Cho phép truy cập camera khi trình duyệt hỏi</li>
+        </ol>
+        <p style="font-size:13px;opacity:0.8;">
+            Trong khi chờ, dùng phím <strong>1, 2, 3, 4</strong> để test hiệu ứng hạt.
+        </p>
+    </div>
+
+    <div id="statusPanel">
+        <div>Cử chỉ hiện tại:</div>
+        <span id="gestureLabel" class="gesture">Đang chờ...</span>
+        <div style="margin-top:10px;">
+            FPS: <span id="fps">0</span> |
+            Hạt: <span id="particleCount">0</span>
+        </div>
+    </div>
+
+    <div class="instructions">
+        <h3>🎮 Điều khiển</h3>
+        <div><strong>Cử chỉ tay:</strong></div>
+        <div>✊ Nắm đấm → Hình cầu</div>
+        <div>☝️ 1 ngón → "hello, world"</div>
+        <div>✌️ 2 ngón → "I'm Tính Lâm"</div>
+        <div>🖐️ Mở tay → Giãn nở</div>
+        <div style="margin-top:10px;"><strong>Phím tắt:</strong></div>
+        <div><span class="key">1</span> hello, world</div>
+        <div><span class="key">2</span> I'm Tính Lâm</div>
+        <div><span class="key">3</span> Hình cầu</div>
+        <div><span class="key">4</span> Giãn nở</div>
+    </div>
+
+    <div id="fingerPanel">
+        <h4>🖐️ Phát hiện ngón tay</h4>
+        <div class="finger-row">Ngón cái: <span class="finger-indicator" id="f0"></span></div>
+        <div class="finger-row">Ngón trỏ: <span class="finger-indicator" id="f1"></span></div>
+        <div class="finger-row">Ngón giữa: <span class="finger-indicator" id="f2"></span></div>
+        <div class="finger-row">Áp út: <span class="finger-indicator" id="f3"></span></div>
+        <div class="finger-row">Ngón út: <span class="finger-indicator" id="f4"></span></div>
+        <div style="margin-top:8px;font-size:11px;opacity:0.7;">
+            Độ mở: <span id="opennessVal">0.00</span>
+        </div>
+    </div>
+
+    <div id="cameraContainer">
+        <video id="cameraPreview" autoplay playsinline muted></video>
+        <canvas id="handCanvas"></canvas>
+        <div id="fingerDebug"></div>
+    </div>
+
+    <canvas id="threeCanvas"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+
+    <script>
+        /* =========================================================
+           CẤU HÌNH
+           ========================================================= */
+        const CONFIG = {
+            particleCount: 10000,
+            lerpSpeed: 0.06,
+            cameraZ: 18,
+            rotationSpeed: 0.004,
+            sphereRadius: 5,
+            expandScale: 14,
+            handSmoothing: 0.25,
+            gestureDebounce: 5,    // Số khung hình ổn định mới đổi trạng thái
+            fingerThreshold: 0.07
+        };
+
+        /* =========================================================
+           BIẾN TOÀN CỤC
+           ========================================================= */
+        let scene, camera, renderer, particles;
+        let positions, targets, colors;
+        let currentState = 'sphere';
+        let pendingState = null;
+        let pendingFrames = 0;
+        let handOpenness = 0;
+        let rotationAngle = 0;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsDisplay = 0;
+        let handDetected = false;
+
+        /* =========================================================
+           THREE.JS SETUP
+           ========================================================= */
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000011, 0.015);
+
+            camera = new THREE.PerspectiveCamera(
+                60, window.innerWidth / window.innerHeight, 0.1, 1000
+            );
+            camera.position.z = CONFIG.cameraZ;
+
+            renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById('threeCanvas'),
+                antialias: true, alpha: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            createParticles();
+            createLights();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createParticles() {
+            const count = CONFIG.particleCount;
+            const geometry = new THREE.BufferGeometry();
+
+            positions = new Float32Array(count * 3);
+            targets = new Float32Array(count * 3);
+            colors = new Float32Array(count * 3);
+
+            for (let i = 0; i < count; i++) {
+                const i3 = i * 3;
+                const phi = Math.acos(-1 + (2 * i) / count);
+                const theta = Math.sqrt(count * Math.PI) * phi;
+
+                positions[i3] = CONFIG.sphereRadius * Math.cos(theta) * Math.sin(phi);
+                positions[i3 + 1] = CONFIG.sphereRadius * Math.sin(theta) * Math.sin(phi);
+                positions[i3 + 2] = CONFIG.sphereRadius * Math.cos(phi);
+
+                targets[i3] = positions[i3];
+                targets[i3 + 1] = positions[i3 + 1];
+                targets[i3 + 2] = positions[i3 + 2];
+
+                const t = i / count;
+                colors[i3] = 0.2 + t * 0.8;
+                colors[i3 + 1] = 1.0 - t * 0.5;
+                colors[i3 + 2] = 1.0;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uSize: { value: 4.5 },
+                    uPixelRatio: { value: renderer.getPixelRatio() }
+                },
+                vertexShader: `
+                uniform float uTime;
+                uniform float uSize;
+                uniform float uPixelRatio;
+                attribute vec3 color;
+                varying vec3 vColor;
+                void main() {
+                    vColor = color;
+                    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+                    gl_Position = projectionMatrix * mvPos;
+                    gl_PointSize = uSize * uPixelRatio * (10.0 / -mvPos.z);
+                    gl_PointSize *= (1.0 + 0.15 * sin(uTime * 3.0 + position.x * 2.0));
+                }
+            `,
+                fragmentShader: `
+                varying vec3 vColor;
+                void main() {
+                    float dist = length(gl_PointCoord - vec2(0.5));
+                    if (dist > 0.5) discard;
+                    float alpha = 1.0 - smoothstep(0.15, 0.5, dist);
+                    gl_FragColor = vec4(vColor * 1.2, alpha);
+                }
+            `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+            document.getElementById('particleCount').textContent = count;
+        }
+
+        function createLights() {
+            scene.add(new THREE.AmbientLight(0x222244, 0.5));
+            const p1 = new THREE.PointLight(0x00ffff, 1, 50);
+            p1.position.set(10, 10, 10);
+            scene.add(p1);
+            const p2 = new THREE.PointLight(0xff00ff, 1, 50);
+            p2.position.set(-10, -10, 10);
+            scene.add(p2);
+        }
+
+        /* =========================================================
+           HÌNH CẦU
+           ========================================================= */
+        function setTargetSphere(scale = 1.0) {
+            const count = CONFIG.particleCount;
+            const radius = CONFIG.sphereRadius * scale;
+            for (let i = 0; i < count; i++) {
+                const i3 = i * 3;
+                const phi = Math.acos(-1 + (2 * i) / count);
+                const theta = Math.sqrt(count * Math.PI) * phi;
+                targets[i3] = radius * Math.cos(theta) * Math.sin(phi);
+                targets[i3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+                targets[i3 + 2] = radius * Math.cos(phi);
+                // Màu cyan-magenta
+                const t = i / count;
+                colors[i3] = 0.2 + t * 0.8;
+                colors[i3 + 1] = 1.0 - t * 0.5;
+                colors[i3 + 2] = 1.0;
+            }
+            particles.geometry.attributes.color.needsUpdate = true;
+        }
+
+        /* =========================================================
+           TEXT → HẠT
+           ========================================================= */
+        function textToPositions(text, scale = 1.0) {
+            const count = CONFIG.particleCount;
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 1024;
+            canvas.height = 256;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 160px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const points = [];
+            for (let y = 0; y < canvas.height; y += 2) {
+                for (let x = 0; x < canvas.width; x += 2) {
+                    const idx = (y * canvas.width + x) * 4;
+                    if (data[idx] > 128) points.push([x, y]);
+                }
+            }
+
+            if (points.length === 0) {
+                setTargetSphere();
+                return;
+            }
+
+            for (let i = 0; i < count; i++) {
+                const i3 = i * 3;
+                const p = points[Math.floor(Math.random() * points.length)];
+                targets[i3] = (p[0] - canvas.width / 2) * 0.015 * scale;
+                targets[i3 + 1] = -(p[1] - canvas.height / 2) * 0.015 * scale;
+                targets[i3 + 2] = (Math.random() - 0.5) * 1.2 * scale;
+
+                // Màu vàng-cam cho text
+                colors[i3] = 1.0;
+                colors[i3 + 1] = 0.6 + Math.random() * 0.4;
+                colors[i3 + 2] = 0.1 + Math.random() * 0.3;
+            }
+            particles.geometry.attributes.color.needsUpdate = true;
+        }
+
+        /* =========================================================
+           MEDIAPIPE HANDS - CẢI TIẾN
+           ========================================================= */
+        function initHandDetection() {
+            const video = document.getElementById('cameraPreview');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showCameraError('Trình duyệt không hỗ trợ camera API');
+                return;
+            }
+
+            const hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onHandResults);
+
+            const cam = new Camera(video, {
+                onFrame: async () => {
+                    try {
+                        await hands.send({ image: video });
+                    } catch (e) {
+                        console.warn('Hand detection error:', e);
+                    }
+                },
+                width: 640,
+                height: 480
+            });
+
+            cam.start().then(() => {
+                console.log('Camera started successfully');
+            }).catch(err => {
+                console.error('Camera start failed:', err);
+                showCameraError('Không thể khởi động camera: ' + err.message);
+            });
+        }
+
+        function showCameraError(msg) {
+            const warning = document.getElementById('cameraWarning');
+            warning.innerHTML = `
+            <h2>⚠️ ${msg}</h2>
+            <p>Bạn cần chạy qua <strong>http://localhost</strong> để camera hoạt động.</p>
+            <ol>
+                <li>Chạy: <code>python3 -m http.server 8000</code></li>
+                <li>Truy cập: <code>http://localhost:8000</code></li>
+            </ol>
+            <p>Hoặc dùng phím <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span> để test.</p>
+        `;
+        }
+
+        function onHandResults(results) {
+            // Vẽ skeleton
+            const canvas = document.getElementById('handCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                handDetected = false;
+                updateFingerUI([false, false, false, false, false]);
+                document.getElementById('gestureLabel').textContent = 'Không phát hiện tay';
+                document.getElementById('fingerDebug').textContent = '';
+
+                // Reset pending nếu không có tay lâu
+                pendingState = null;
+                pendingFrames = 0;
+                return;
+            }
+
+            handDetected = true;
+            document.getElementById('cameraWarning').classList.add('hidden');
+
+            const landmarks = results.multiHandLandmarks[0];
+            const handedness = results.multiHandedness[0].label;
+
+            // Vẽ skeleton lên canvas overlay
+            drawConnectors(ctx, landmarks, HAND_CONNECTIONS,
+                { color: '#00FF00', lineWidth: 2 });
+            drawLandmarks(ctx, landmarks,
+                { color: '#FF0000', lineWidth: 1, radius: 2 });
+
+            // Phát hiện ngón
+            const fingers = detectFingers(landmarks, handedness);
+            const openness = calculateHandOpenness(landmarks);
+
+            // Smoothing
+            handOpenness = handOpenness * (1 - CONFIG.handSmoothing) +
+                openness * CONFIG.handSmoothing;
+
+            // Cập nhật UI
+            updateFingerUI(fingers);
+            document.getElementById('opennessVal').textContent = handOpenness.toFixed(2);
+
+            const extendedCount = fingers.filter(Boolean).length;
+
+            // Quyết định gesture
+            let newState = currentState;
+            let gestureLabel = '';
+
+            // Ưu tiên: nắm đấm (0 ngón) → sphere
+            if (extendedCount === 0) {
+                newState = 'sphere';
+                gestureLabel = '✊ Nắm đấm → Hình cầu';
+            }
+            // 1 ngón trỏ → text1
+            else if (extendedCount === 1 && fingers[1] && !fingers[0]) {
+                newState = 'text1';
+                gestureLabel = '☝️ 1 ngón → "hello, world"';
+            }
+            // 2 ngón (trỏ + giữa) → text2
+            else if (extendedCount === 2 && fingers[1] && fingers[2] && !fingers[0]) {
+                newState = 'text2';
+                gestureLabel = '✌️ 2 ngón → "I\'m Tính Lâm"';
+            }
+            // Bàn tay mở (4-5 ngón) → expand
+            else if (extendedCount >= 4) {
+                newState = 'expand';
+                gestureLabel = '🖐️ Mở tay → Giãn nở';
+            }
+            // Các cử chỉ khác
+            else {
+                gestureLabel = `🤚 ${extendedCount} ngón (giữ nguyên)`;
+            }
+
+            document.getElementById('gestureLabel').textContent = gestureLabel;
+            document.getElementById('fingerDebug').textContent =
+                `${handedness} | ${extendedCount} ngón | open: ${handOpenness.toFixed(2)}`;
+
+            // Debounce: chỉ đổi state nếu gesture ổn định trong N frames
+            if (newState !== currentState) {
+                if (pendingState === newState) {
+                    pendingFrames++;
+                    if (pendingFrames >= CONFIG.gestureDebounce) {
+                        currentState = newState;
+                        onStateChange();
+                        pendingState = null;
+                        pendingFrames = 0;
+                    }
+                } else {
+                    pendingState = newState;
+                    pendingFrames = 1;
+                }
+            } else {
+                pendingState = null;
+                pendingFrames = 0;
+            }
+        }
+
+        function detectFingers(landmarks, handedness) {
+            const fingers = [];
+
+            // === NGÓN CÁI ===
+            // Dùng vị trí tương đối theo trục X so với MCP
+            const thumbTip = landmarks[4];
+            const thumbIp = landmarks[3];
+            const thumbMcp = landmarks[2];
+            const thumbCmc = landmarks[1];
+
+            // Vector từ cmc -> mcp (hướng ngón cái khi duỗi)
+            const baseDirX = thumbMcp.x - thumbCmc.x;
+            // Tip xa hơn ip theo hướng đó = duỗi
+            const tipDist = thumbTip.x - thumbMcp.x;
+            const ipDist = thumbIp.x - thumbMcp.x;
+
+            // Cho tay trái (mirrored): tip.x > mcp.x khi duỗi
+            // Cho tay phải: tip.x < mcp.x khi duỗi
+            // Đơn giản hơn: khoảng cách tip tới cổ tay > ip tới cổ tay
+            const wrist = landmarks[0];
+            const dTip = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y);
+            const dIp = Math.hypot(thumbIp.x - wrist.x, thumbIp.y - wrist.y);
+            fingers.push(dTip > dIp * 1.15);
+
+            // === 4 NGÓN CÒN LẠI ===
+            // Mốc: PIP (đốt giữa), MCP (gốc), TIP (đầu)
+            const fingerIndices = [
+                { tip: 8, pip: 6, mcp: 5 },   // Trỏ
+                { tip: 12, pip: 10, mcp: 9 }, // Giữa
+                { tip: 16, pip: 14, mcp: 13 },// Áp út
+                { tip: 20, pip: 18, mcp: 17 } // Út
+            ];
+
+            for (const fi of fingerIndices) {
+                const tip = landmarks[fi.tip];
+                const pip = landmarks[fi.pip];
+                const mcp = landmarks[fi.mcp];
+
+                // Phương pháp 1: Tip cao hơn PIP (y nhỏ hơn = cao hơn trong ảnh)
+                const yDiff = pip.y - tip.y;
+
+                // Phương pháp 2: Khoảng cách tip-wrist vs pip-wrist
+                const dTip2 = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                const dPip2 = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+
+                // Ngón duỗi nếu: tip cao hơn pip VÀ tip xa cổ tay hơn pip
+                const isExtended = (yDiff > CONFIG.fingerThreshold) && (dTip2 > dPip2);
+                fingers.push(isExtended);
+            }
+
+            return fingers; // [thumb, index, middle, ring, pinky]
+        }
+
+        function calculateHandOpenness(landmarks) {
+            const wrist = landmarks[0];
+            const tips = [4, 8, 12, 16, 20];
+            let total = 0;
+            for (const idx of tips) {
+                const tip = landmarks[idx];
+                total += Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+            }
+            const avg = total / tips.length;
+            return Math.min(1.0, Math.max(0, (avg - 0.15) / 0.35));
+        }
+
+        function updateFingerUI(fingers) {
+            for (let i = 0; i < 5; i++) {
+                const el = document.getElementById('f' + i);
+                if (el) {
+                    if (fingers[i]) el.classList.add('active');
+                    else el.classList.remove('active');
+                }
+            }
+        }
+
+        /* =========================================================
+           CHUYỂN TRẠNG THÁI
+           ========================================================= */
+        function onStateChange() {
+            switch (currentState) {
+                case 'sphere':
+                    setTargetSphere(1.0);
+                    break;
+                case 'text1':
+                    textToPositions('hello, world', 1.2);
+                    break;
+                case 'text2':
+                    textToPositions("I'm Tính Lâm", 1.0);
+                    break;
+                case 'expand':
+                    setTargetSphere(CONFIG.expandScale / CONFIG.sphereRadius);
+                    break;
+            }
+        }
+
+        /* =========================================================
+           PHÍM TẮT DỰ PHÒNG
+           ========================================================= */
+        window.addEventListener('keydown', (e) => {
+            let newState = null;
+            if (e.key === '1') newState = 'text1';
+            else if (e.key === '2') newState = 'text2';
+            else if (e.key === '3') newState = 'sphere';
+            else if (e.key === '4') newState = 'expand';
+
+            if (newState && newState !== currentState) {
+                currentState = newState;
+                onStateChange();
+                document.getElementById('cameraWarning').classList.add('hidden');
+
+                const labels = {
+                    'text1': '☝️ 1 ngón → "hello, world"',
+                    'text2': '✌️ 2 ngón → "I\'m Tính Lâm"',
+                    'sphere': '✊ Nắm đấm → Hình cầu',
+                    'expand': '🖐️ Mở tay → Giãn nở'
+                };
+                document.getElementById('gestureLabel').textContent =
+                    '[KEYBOARD] ' + labels[newState];
+            }
+        });
+
+        /* =========================================================
+           ANIMATION LOOP
+           ========================================================= */
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = now - lastTime;
+
+            frameCount++;
+            if (delta >= 1000) {
+                fpsDisplay = Math.round((frameCount * 1000) / delta);
+                document.getElementById('fps').textContent = fpsDisplay;
+                frameCount = 0;
+                lastTime = now;
+            }
+
+            particles.material.uniforms.uTime.value = now * 0.001;
+
+            // Lerp về target
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const i3 = i * 3;
+                positions[i3] += (targets[i3] - positions[i3]) * CONFIG.lerpSpeed;
+                positions[i3 + 1] += (targets[i3 + 1] - positions[i3 + 1]) * CONFIG.lerpSpeed;
+                positions[i3 + 2] += (targets[i3 + 2] - positions[i3 + 2]) * CONFIG.lerpSpeed;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            // Xoay 3D cho text
+            if (currentState === 'text1' || currentState === 'text2') {
+                rotationAngle += CONFIG.rotationSpeed;
+                particles.rotation.y = Math.sin(rotationAngle) * 0.6;
+                particles.rotation.x = Math.sin(rotationAngle * 0.7) * 0.25;
+            } else {
+                particles.rotation.y += 0.0015;
+                particles.rotation.x *= 0.95;
+            }
+
+            // Camera breathing
+            camera.position.x = Math.sin(now * 0.0002) * 2;
+            camera.position.y = Math.cos(now * 0.0003) * 1;
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /* =========================================================
+           KHỞI ĐỘNG
+           ========================================================= */
+        async function init() {
+            initThree();
+            animate();
+
+            // Đợi 1 giây để Three.js ổn định
+            await new Promise(r => setTimeout(r, 500));
+
+            // Kiểm tra xem có đang chạy qua file:// không
+            if (window.location.protocol === 'file:') {
+                showCameraError(
+                    'Bạn đang mở file qua <code>file://</code>.<br>' +
+                    'Vui lòng chạy qua local server để camera hoạt động.'
+                );
+            }
+
+            try {
+                initHandDetection();
+            } catch (e) {
+                console.error('Hand detection init failed:', e);
+            }
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+
+</html>
